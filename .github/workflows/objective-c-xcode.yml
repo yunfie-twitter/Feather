@@ -50,13 +50,7 @@ jobs:
             exit 1
           fi
 
-          default="$(printf '%s' "$scheme_json" | ruby -e '
-require "json"
-j = JSON.parse(STDIN.read)
-name = j.dig("workspace","schemes",0) || j.dig("project","schemes",0) || j.dig("project","targets",0)
-abort("No scheme/target found in xcodebuild -list -json output") unless name
-puts name
-')"
+          default="$(printf '%s' "$scheme_json" | ruby -rjson -e 'j=JSON.parse(STDIN.read); name=j.dig("workspace","schemes",0) || j.dig("project","schemes",0) || j.dig("project","targets",0); abort("No scheme/target found in xcodebuild -list -json output") unless name; puts name')"
 
           printf '%s' "$default" > default
           echo "Using default scheme: $default"
