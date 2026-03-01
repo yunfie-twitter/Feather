@@ -12,19 +12,43 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout (with submodules)
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Select xcodeproj/xcworkspace
+        id: proj
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ls -1 *.xcworkspace >/dev/null 2>&1; then
+            echo "filetype=workspace" >> "$GITHUB_OUTPUT"
+            echo "file=$(ls -1 *.xcworkspace | head -n 1)" >> "$GITHUB_OUTPUT"
+          else
+            echo "filetype=project" >> "$GITHUB_OUTPUT"
+            echo "file=$(ls -1 *.xcodeproj | head -n 1)" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set Default Scheme
+        shell: bash
         run: |
-          scheme_list=$(xcodebuild -list -json | tr -d "\n")
-          default=$(echo $scheme_list | ruby -e "require 'json'; puts JSON.parse(STDIN.gets)['project']['targets'][0]")
-          echo $default | cat >default
-          echo Using default scheme: $default
+          set -euo pipefail
+          scheme_json="$(xcodebuild -list -json -"${{ steps.proj.outputs.filetype }}" "${{ steps.proj.outputs.file }}" 2>/dev/null | tr -d '\n')"
+          if [ -z "$scheme_json" ]; then
+            echo "xcodebuild -list -json returned empty output" >&2
+            exit 1
+          fi
+          default="$(printf '%s' "$scheme_json" | ruby -e "require 'json'; puts JSON.parse(STDIN.read)['project']['targets'][0]")"
+          printf '%s' "$default" > default
+          echo "Using default scheme: $default"
+
       - name: Build
-        env:
-          scheme: ${{ 'default' }}
+        shell: bash
         run: |
-          if [ $scheme = default ]; then scheme=$(cat default); fi
-          if [ "`ls -A | grep -i \\.xcworkspace\$`" ]; then filetype_parameter="workspace" && file_to_build="`ls -A | grep -i \\.xcworkspace\$`"; else filetype_parameter="project" && file_to_build="`ls -A | grep -i \\.xcodeproj\$`"; fi
-          file_to_build=`echo $file_to_build | awk '{$1=$1;print}'`
-          xcodebuild clean build analyze -scheme "$scheme" -"$filetype_parameter" "$file_to_build" | xcpretty && exit ${PIPESTATUS[0]}
+          set -euo pipefail
+          scheme="$(cat default)"
+          xcodebuild clean build analyze \
+            -scheme "$scheme" \
+            -"${{ steps.proj.outputs.filetype }}" "${{ steps.proj.outputs.file }}" \
+            | xcpretty
