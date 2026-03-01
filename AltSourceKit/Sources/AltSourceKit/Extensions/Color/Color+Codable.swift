@@ -9,6 +9,7 @@ import SwiftUI
 
 // taken from skykit
 // MARK: - Make Color conform to codable
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Color: Codable {
 	public init(hex: String) {
 		let rgba = hex.toRGBA()
@@ -38,18 +39,16 @@ extension Color: Codable {
 	}
 
 	public func toHex(alpha: Bool = false) -> String {
-		
 		// had to use this shim
 		let (r, g, b, a) = {
 			if #available(iOS 17.0, *) {
-				
 				let resolved = resolve(in: EnvironmentValues())
-				
+
 				let r = resolved.red
 				let g = resolved.green
 				let b = resolved.blue
 				let a = resolved.opacity
-				
+
 				return (r, g, b, a)
 			} else {
 				let (r, g, b, a) = components
@@ -110,6 +109,7 @@ public extension String {
 	}
 }
 
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Color: @retroactive RawRepresentable {
 	public var rawValue: String {
 		return toHex
@@ -121,26 +121,33 @@ extension Color: @retroactive RawRepresentable {
 }
 
 // MARK: - Get color values of Color
-	// taken from meret
+// taken from meret
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 public extension Color {
 	var components: (red: CGFloat, green: CGFloat, blue: CGFloat, opacity: CGFloat) {
-		
-#if canImport(UIKit)
+		#if canImport(UIKit)
 		typealias NativeColor = UIColor
-#elseif canImport(AppKit)
+		#elseif canImport(AppKit)
 		typealias NativeColor = NSColor
-#endif
-		
+		#endif
+
 		var r: CGFloat = 0
 		var g: CGFloat = 0
 		var b: CGFloat = 0
 		var o: CGFloat = 0
-		
-		guard NativeColor(self).getRed(&r, green: &g, blue: &b, alpha: &o) else {
-			// You can handle the failure here as you want
+
+		#if canImport(UIKit)
+		let ok = NativeColor(self).getRed(&r, green: &g, blue: &b, alpha: &o)
+		#elseif canImport(AppKit)
+		let ok = NativeColor(self).usingColorSpace(.deviceRGB)?.getRed(&r, green: &g, blue: &b, alpha: &o) ?? false
+		#else
+		let ok = false
+		#endif
+
+		guard ok else {
 			return (0, 0, 0, 0)
 		}
-		
+
 		return (r, g, b, o)
 	}
 }
