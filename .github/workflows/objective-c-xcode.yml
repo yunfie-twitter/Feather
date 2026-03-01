@@ -43,12 +43,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           scheme_json="$(xcodebuild -list -json -"${{ steps.proj.outputs.filetype }}" "${{ steps.proj.outputs.file }}" | tr -d '\n')"
           if [ -z "$scheme_json" ]; then
             echo "xcodebuild -list -json returned empty output" >&2
             exit 1
           fi
-          default="$(printf '%s' "$scheme_json" | ruby -e "require 'json'; puts JSON.parse(STDIN.read)['project']['targets'][0]")"
+
+          default="$(printf '%s' "$scheme_json" | ruby -e '
+require "json"
+j = JSON.parse(STDIN.read)
+name = j.dig("workspace","schemes",0) || j.dig("project","schemes",0) || j.dig("project","targets",0)
+abort("No scheme/target found in xcodebuild -list -json output") unless name
+puts name
+')"
+
           printf '%s' "$default" > default
           echo "Using default scheme: $default"
 
