@@ -39,25 +39,13 @@ extension Color: Codable {
 	}
 
 	public func toHex(alpha: Bool = false) -> String {
-		// had to use this shim
 		let (r, g, b, a) = {
 			if #available(iOS 17.0, *) {
 				let resolved = resolve(in: EnvironmentValues())
-
-				let r = resolved.red
-				let g = resolved.green
-				let b = resolved.blue
-				let a = resolved.opacity
-
-				return (r, g, b, a)
+				return (resolved.red, resolved.green, resolved.blue, resolved.opacity)
 			} else {
 				let (r, g, b, a) = components
-				return (
-					Float(r),
-					Float(g),
-					Float(b),
-					Float(a)
-				)
+				return (Float(r), Float(g), Float(b), Float(a))
 			}
 		}()
 
@@ -111,13 +99,8 @@ public extension String {
 
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 extension Color: @retroactive RawRepresentable {
-	public var rawValue: String {
-		return toHex
-	}
-
-	public init?(rawValue: String) {
-		self.init(hex: rawValue)
-	}
+	public var rawValue: String { toHex }
+	public init?(rawValue: String) { self.init(hex: rawValue) }
 }
 
 // MARK: - Get color values of Color
@@ -139,15 +122,15 @@ public extension Color {
 		#if canImport(UIKit)
 		let ok = NativeColor(self).getRed(&r, green: &g, blue: &b, alpha: &o)
 		#elseif canImport(AppKit)
-		let ok = NativeColor(self).usingColorSpace(.deviceRGB)?.getRed(&r, green: &g, blue: &b, alpha: &o) ?? false
+		let ok = (NativeColor(self).usingColorSpace(.deviceRGB) != nil)
+		if ok {
+			NativeColor(self).usingColorSpace(.deviceRGB)!.getRed(&r, green: &g, blue: &b, alpha: &o)
+		}
 		#else
 		let ok = false
 		#endif
 
-		guard ok else {
-			return (0, 0, 0, 0)
-		}
-
+		guard ok else { return (0, 0, 0, 0) }
 		return (r, g, b, o)
 	}
 }
